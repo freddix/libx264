@@ -1,6 +1,6 @@
 %define		snap	20120715
 %define		snaph	2245
-%define		rel	2
+%define		rel	3
 %define		api	125
 
 Summary:	H264 encoder library
@@ -15,9 +15,9 @@ Source0:	ftp://ftp.videolan.org/pub/videolan/x264/snapshots/x264-snapshot-%{snap
 # http://komisar.gin.by/x.patch/bm.patches/
 Patch0:		%{name}-mp4_L-SMASH.patch
 URL:		http://developers.videolan.org/x264.html
-BuildRequires:	ffmpeg-devel
 BuildRequires:	gettext-devel
 BuildRequires:	gtk+-devel
+BuildRequires:	libav-devel
 BuildRequires:	pkg-config
 BuildRequires:	yasm
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
