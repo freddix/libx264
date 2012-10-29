@@ -1,6 +1,6 @@
 %define		snap	20120715
 %define		snaph	2245
-%define		rel	3
+%define		rel	5
 %define		api	125
 
 Summary:	H264 encoder library
@@ -22,7 +22,7 @@ BuildRequires:	pkg-config
 BuildRequires:	yasm
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
-%define		specflags	-ffast-math -std=gnu99 -O3
+%define		specflags	-std=gnu99 -O3
 
 %description
 libx264 library for encoding H264 video format.
@@ -71,8 +71,8 @@ rm -rf $RPM_BUILD_ROOT
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%post	-p /sbin/ldconfig
-%postun	-p /sbin/ldconfig
+%post	-p /usr/sbin/ldconfig
+%postun	-p /usr/sbin/ldconfig
 
 %files
 %defattr(644,root,root,755)
