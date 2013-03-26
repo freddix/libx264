@@ -1,7 +1,7 @@
-%define		snap	20130109
+%define		snap	20130316
 %define		snaph	2245
-%define		rel	1
-%define		api	129
+%define		rel	2
+%define		api	130
 
 Summary:	H264 encoder library
 Name:		libx264
@@ -10,7 +10,7 @@ Release:	1.%{snap}_%{snaph}.%{rel}
 License:	GPL v2
 Group:		Libraries
 Source0:	ftp://ftp.videolan.org/pub/videolan/x264/snapshots/x264-snapshot-%{snap}-%{snaph}.tar.bz2
-# Source0-md5:	aa8b6a70f2415722d4cb74fb7c2272f5
+# Source0-md5:	252fa26a06c18b01fcab1eb18d04d040
 # get rid of gpac
 # http://komisar.gin.by/x.patch/bm.patches/
 Patch0:		%{name}-mp4_L-SMASH.patch

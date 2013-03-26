@@ -1,19 +1,19 @@
-From d224adf4abffec10554002cf2c68a3f8e7f23e3d Mon Sep 17 00:00:00 2001
+From f58bbc07e3030d1b3009c677f6dbca2d31fa56fe Mon Sep 17 00:00:00 2001
 From: Anton Mitrofanov <BugMaster@narod.ru>
-Date: Thu, 10 Jan 2013 23:38:34 +0400
+Date: Tue, 5 Mar 2013 19:33:27 +0400
 Subject: [PATCH] Use L-SMASH for mp4 muxing
 
 ---
  Makefile                 |    7 +-
  configure                |   31 +-
- output/mp4.c             |  571 +++--
+ output/mp4.c             |  571 ++--
  output/mp4/a52.c         |  633 ++++
  output/mp4/a52.h         |   75 +
  output/mp4/alac.c        |  113 +
- output/mp4/box.c         |  250 ++
+ output/mp4/box.c         |  251 ++
  output/mp4/box.h         | 2248 +++++++++++++
  output/mp4/chapter.c     |  367 +++
- output/mp4/description.c | 2821 +++++++++++++++++
+ output/mp4/description.c | 2822 +++++++++++++++++
  output/mp4/description.h |   40 +
  output/mp4/dts.c         | 1331 ++++++++
  output/mp4/dts.h         |  113 +
@@ -22,23 +22,23 @@ Subject: [PATCH] Use L-SMASH for mp4 muxing
  output/mp4/importer.c    | 3716 ++++++++++++++++++++++
  output/mp4/importer.h    |   47 +
  output/mp4/internal.h    |   37 +
- output/mp4/isom.c        | 7912 ++++++++++++++++++++++++++++++++++++++++++++++
+ output/mp4/isom.c        | 7915 ++++++++++++++++++++++++++++++++++++++++++++++
  output/mp4/isom.h        |   34 +
- output/mp4/lsmash.h      | 2294 ++++++++++++++
+ output/mp4/lsmash.h      | 2305 ++++++++++++++
  output/mp4/meta.c        |  461 +++
  output/mp4/mp4a.c        |  935 ++++++
  output/mp4/mp4a.h        |  138 +
  output/mp4/mp4sys.c      | 1354 ++++++++
  output/mp4/mp4sys.h      |  211 ++
- output/mp4/summary.c     |  305 ++
+ output/mp4/summary.c     |  306 ++
  output/mp4/utils.c       |  841 +++++
  output/mp4/utils.h       |  229 ++
  output/mp4/vc1.c         |  985 ++++++
  output/mp4/vc1.h         |  137 +
- output/mp4/write.c       | 1918 +++++++++++
+ output/mp4/write.c       | 1919 +++++++++++
  output/mp4/write.h       |   39 +
  x264.c                   |   20 +-
- 34 files changed, 32418 insertions(+), 258 deletions(-)
+ 34 files changed, 32436 insertions(+), 258 deletions(-)
  create mode 100644 output/mp4/a52.c
  create mode 100644 output/mp4/a52.h
  create mode 100644 output/mp4/alac.c
@@ -96,7 +96,7 @@ index 7a22c42..a7ebe74 100644
  ifneq ($(findstring HAVE_VISUALIZE 1, $(CONFIG)),)
  SRCS   += common/visualize.c common/display-x11.c
 diff --git a/configure b/configure
-index cb8f669..19638ea 100755
+index f159602..c6a3d08 100755
 --- a/configure
 +++ b/configure
 @@ -50,7 +50,6 @@ External library support:
@@ -142,7 +142,7 @@ index cb8f669..19638ea 100755
          --disable-gpl)
              gpl="no"
              ;;
-@@ -891,28 +885,6 @@ if [ "$swscale" = "yes" ]; then
+@@ -903,28 +897,6 @@ if [ "$swscale" = "yes" ]; then
      fi
  fi
  
@@ -171,8 +171,8 @@ index cb8f669..19638ea 100755
  if [ "$avs" = "auto" ] ; then
      avs="no"
      # cygwin can use avisynth if it can use LoadLibrary
-@@ -1183,7 +1155,6 @@ interlaced:    $interlaced
- avs:           $avs
+@@ -1205,7 +1177,6 @@ interlaced:    $interlaced
+ avs:           $avstype
  lavf:          $lavf
  ffms:          $ffms
 -gpac:          $gpac
@@ -1721,10 +1721,10 @@ index 0000000..8d20af9
 +#undef ALAC_SPECIFIC_BOX_LENGTH
 diff --git a/output/mp4/box.c b/output/mp4/box.c
 new file mode 100644
-index 0000000..2b3496d
+index 0000000..fab1b47
 --- /dev/null
 +++ b/output/mp4/box.c
-@@ -0,0 +1,250 @@
+@@ -0,0 +1,251 @@
 +/*****************************************************************************
 + * box.c:
 + *****************************************************************************
@@ -1952,7 +1952,8 @@ index 0000000..2b3496d
 +/* Return 1 if the sample type is uncompressed Y'CbCr video, Otherwise return 0. */
 +int isom_is_uncompressed_ycbcr( lsmash_box_type_t type )
 +{
-+    return lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_V210_VIDEO )
++    return lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_2VUY_VIDEO )
++        || lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_V210_VIDEO )
 +        || lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_V216_VIDEO )
 +        || lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_V308_VIDEO )
 +        || lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_V408_VIDEO )
@@ -4604,10 +4605,10 @@ index 0000000..7bfc8b2
 +}
 diff --git a/output/mp4/description.c b/output/mp4/description.c
 new file mode 100644
-index 0000000..26410cd
+index 0000000..dd87d71
 --- /dev/null
 +++ b/output/mp4/description.c
-@@ -0,0 +1,2821 @@
+@@ -0,0 +1,2822 @@
 +/*****************************************************************************
 + * description.c:
 + *****************************************************************************
@@ -4654,7 +4655,8 @@ index 0000000..26410cd
 +
 +static int isom_is_qt_video( lsmash_codec_type_t type )
 +{
-+    return lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_APCH_VIDEO )
++    return lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_2VUY_VIDEO )
++        || lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_APCH_VIDEO )
 +        || lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_APCN_VIDEO )
 +        || lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_APCS_VIDEO )
 +        || lsmash_check_codec_type_identical( type, QT_CODEC_TYPE_APCO_VIDEO )
@@ -11408,7 +11410,7 @@ index 0000000..3dc2be0
 +}
 diff --git a/output/mp4/importer.c b/output/mp4/importer.c
 new file mode 100644
-index 0000000..5a66d10
+index 0000000..7769c72
 --- /dev/null
 +++ b/output/mp4/importer.c
 @@ -0,0 +1,3716 @@
@@ -14403,7 +14405,7 @@ index 0000000..5a66d10
 +    mp4sys_h264_info_t *info = (mp4sys_h264_info_t *)importer->info;
 +    if( !info || track_number != 1 || info->status != MP4SYS_IMPORTER_EOF )
 +        return 0;
-+    return info->ts_list.sample_count > 1
++    return info->ts_list.sample_count
 +         ? 1
 +         : UINT32_MAX;    /* arbitrary */
 +}
@@ -14952,7 +14954,7 @@ index 0000000..5a66d10
 +    mp4sys_vc1_info_t *info = (mp4sys_vc1_info_t *)importer->info;
 +    if( !info || track_number != 1 || info->status != MP4SYS_IMPORTER_EOF )
 +        return 0;
-+    return info->ts_list.sample_count > 1
++    return info->ts_list.sample_count
 +         ? 1
 +         : UINT32_MAX;    /* arbitrary */
 +}
@@ -15078,7 +15080,7 @@ index 0000000..5a66d10
 +uint32_t mp4sys_importer_get_last_delta( mp4sys_importer_t *importer, uint32_t track_number )
 +{
 +    if( !importer || !importer->funcs.get_last_delta )
-+        return -1;
++        return 0;
 +    return importer->funcs.get_last_delta( importer, track_number );
 +}
 +
@@ -15226,10 +15228,10 @@ index 0000000..9864ca8
 +#endif
 diff --git a/output/mp4/isom.c b/output/mp4/isom.c
 new file mode 100644
-index 0000000..4ea1e43
+index 0000000..b82a7db
 --- /dev/null
 +++ b/output/mp4/isom.c
-@@ -0,0 +1,7912 @@
+@@ -0,0 +1,7915 @@
 +/*****************************************************************************
 + * isom.c:
 + *****************************************************************************
@@ -15605,12 +15607,13 @@ index 0000000..4ea1e43
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( ISOM_CODEC_TYPE_S263_VIDEO, isom_setup_visual_description );
 +#endif
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( ISOM_CODEC_TYPE_VC_1_VIDEO, isom_setup_visual_description );
++        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( QT_CODEC_TYPE_2VUY_VIDEO, isom_setup_visual_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( QT_CODEC_TYPE_APCH_VIDEO, isom_setup_visual_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( QT_CODEC_TYPE_APCN_VIDEO, isom_setup_visual_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( QT_CODEC_TYPE_APCS_VIDEO, isom_setup_visual_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( QT_CODEC_TYPE_APCO_VIDEO, isom_setup_visual_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( QT_CODEC_TYPE_AP4H_VIDEO, isom_setup_visual_description );
-+        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( QT_CODEC_TYPE_DVC_VIDEO, isom_setup_visual_description );
++        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( QT_CODEC_TYPE_DVC_VIDEO,  isom_setup_visual_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( QT_CODEC_TYPE_DVCP_VIDEO, isom_setup_visual_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( QT_CODEC_TYPE_DVPP_VIDEO, isom_setup_visual_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( QT_CODEC_TYPE_DV5N_VIDEO, isom_setup_visual_description );
@@ -15648,7 +15651,7 @@ index 0000000..4ea1e43
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( ISOM_CODEC_TYPE_G726_AUDIO, isom_setup_audio_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( ISOM_CODEC_TYPE_M4AE_AUDIO, isom_setup_audio_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( ISOM_CODEC_TYPE_MLPA_AUDIO, isom_setup_audio_description );
-+        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( ISOM_CODEC_TYPE_RAW_AUDIO , isom_setup_audio_description );
++        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( ISOM_CODEC_TYPE_RAW_AUDIO,  isom_setup_audio_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( ISOM_CODEC_TYPE_SAWP_AUDIO, isom_setup_audio_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( ISOM_CODEC_TYPE_SEVC_AUDIO, isom_setup_audio_description );
 +        ADD_DESCRIPTION_SETUP_TABLE_ELEMENT( ISOM_CODEC_TYPE_SQCP_AUDIO, isom_setup_audio_description );
@@ -17428,6 +17431,7 @@ index 0000000..4ea1e43
 +        ADD_DESCRIPTION_REMOVER_TABLE_ELEMENT( ISOM_CODEC_TYPE_MJP2_VIDEO, isom_remove_visual_description );
 +        ADD_DESCRIPTION_REMOVER_TABLE_ELEMENT( ISOM_CODEC_TYPE_S263_VIDEO, isom_remove_visual_description );
 +        ADD_DESCRIPTION_REMOVER_TABLE_ELEMENT( ISOM_CODEC_TYPE_VC_1_VIDEO, isom_remove_visual_description );
++        ADD_DESCRIPTION_REMOVER_TABLE_ELEMENT( QT_CODEC_TYPE_2VUY_VIDEO, isom_remove_visual_description );
 +        ADD_DESCRIPTION_REMOVER_TABLE_ELEMENT( QT_CODEC_TYPE_CFHD_VIDEO, isom_remove_visual_description );
 +        ADD_DESCRIPTION_REMOVER_TABLE_ELEMENT( QT_CODEC_TYPE_DV10_VIDEO, isom_remove_visual_description );
 +        ADD_DESCRIPTION_REMOVER_TABLE_ELEMENT( QT_CODEC_TYPE_DVOO_VIDEO, isom_remove_visual_description );
@@ -19434,6 +19438,7 @@ index 0000000..4ea1e43
 +            ADD_DESCRIPTION_UPDATE_SIZE_TABLE_ELEMENT( ISOM_CODEC_TYPE_S263_VIDEO, isom_update_visual_entry_size );
 +#endif
 +            ADD_DESCRIPTION_UPDATE_SIZE_TABLE_ELEMENT( ISOM_CODEC_TYPE_VC_1_VIDEO, isom_update_visual_entry_size );
++            ADD_DESCRIPTION_UPDATE_SIZE_TABLE_ELEMENT( QT_CODEC_TYPE_2VUY_VIDEO, isom_update_visual_entry_size );
 +            ADD_DESCRIPTION_UPDATE_SIZE_TABLE_ELEMENT( QT_CODEC_TYPE_APCH_VIDEO, isom_update_visual_entry_size );
 +            ADD_DESCRIPTION_UPDATE_SIZE_TABLE_ELEMENT( QT_CODEC_TYPE_APCN_VIDEO, isom_update_visual_entry_size );
 +            ADD_DESCRIPTION_UPDATE_SIZE_TABLE_ELEMENT( QT_CODEC_TYPE_APCS_VIDEO, isom_update_visual_entry_size );
@@ -23184,10 +23189,10 @@ index 0000000..8e68d28
 +#endif
 diff --git a/output/mp4/lsmash.h b/output/mp4/lsmash.h
 new file mode 100644
-index 0000000..c25823a
+index 0000000..7002a7d
 --- /dev/null
 +++ b/output/mp4/lsmash.h
-@@ -0,0 +1,2294 @@
+@@ -0,0 +1,2305 @@
 +/*****************************************************************************
 + * lsmash.h:
 + *****************************************************************************
@@ -23409,6 +23414,8 @@ index 0000000..c25823a
 +DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_SVC1_VIDEO,  LSMASH_4CC( 's', 'v', 'c', '1' ) );    /* Scalable Video Coding */
 +DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_VC_1_VIDEO,  LSMASH_4CC( 'v', 'c', '-', '1' ) );    /* SMPTE VC-1 */
 +
++DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_2VUY_VIDEO,    LSMASH_4CC( '2', 'v', 'u', 'y' ) );    /* Uncompressed Y'CbCr, 8-bit-per-component 4:2:2
++                                                                                             *      |Cb(8)|Y'0(8)|Cr(8)|Y'1(8)| */
 +DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_CFHD_VIDEO,    LSMASH_4CC( 'C', 'F', 'H', 'D' ) );    /* CineForm High-Definition (HD) wavelet codec */
 +DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_DV10_VIDEO,    LSMASH_4CC( 'D', 'V', '1', '0' ) );    /* Digital Voodoo 10 bit Uncompressed 4:2:2 codec */
 +DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_DVOO_VIDEO,    LSMASH_4CC( 'D', 'V', 'O', 'O' ) );    /* Digital Voodoo 8 bit Uncompressed 4:2:2 codec */
@@ -23461,12 +23468,21 @@ index 0000000..c25823a
 +DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_ULRG_VIDEO,    LSMASH_4CC( 'U', 'L', 'R', 'G' ) );    /* Ut Video RGB 4:4:4 8bit full-range */
 +DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_ULY0_VIDEO,    LSMASH_4CC( 'U', 'L', 'Y', '0' ) );    /* Ut Video YCbCr 4:2:0 8bit limited */
 +DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_ULY2_VIDEO,    LSMASH_4CC( 'U', 'L', 'Y', '2' ) );    /* Ut Video YCbCr 4:2:2 8bit limited */
-+DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_V210_VIDEO,    LSMASH_4CC( 'v', '2', '1', '0' ) );    /* Uncompressed Y'CbCr, 10-bit-per-component 4:2:2 */
-+DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_V216_VIDEO,    LSMASH_4CC( 'v', '2', '1', '6' ) );    /* Uncompressed Y'CbCr, 10, 12, 14, or 16-bit-per-component 4:2:2 */
-+DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_V308_VIDEO,    LSMASH_4CC( 'v', '3', '0', '8' ) );    /* Uncompressed Y'CbCr, 8-bit-per-component 4:4:4 */
-+DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_V408_VIDEO,    LSMASH_4CC( 'v', '4', '0', '8' ) );    /* Uncompressed Y'CbCr, 8-bit-per-component 4:4:4:4 */
-+DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_V410_VIDEO,    LSMASH_4CC( 'v', '4', '1', '0' ) );    /* Uncompressed Y'CbCr, 10-bit-per-component 4:4:4 */
-+DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_YUV2_VIDEO,    LSMASH_4CC( 'y', 'u', 'v', '2' ) );    /* Uncompressed Y'CbCr, 8-bit-per-component 4:2:2 */
++DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_V210_VIDEO,    LSMASH_4CC( 'v', '2', '1', '0' ) );    /* Uncompressed Y'CbCr, 10-bit-per-component 4:2:2
++                                                                                             *      |Cb0(10)|Y'0(10)|Cr0(10)|XX(2)|
++                                                                                             *      |Y'1(10)|Cb1(10)|Y'2(10)|XX(2)|
++                                                                                             *      |Cr1(10)|Y'3(10)|Cb2(10)|XX(2)|
++                                                                                             *      |Y'4(10)|Cr2(10)|Y'5(10)|XX(2)| (X is a zero bit) */
++DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_V216_VIDEO,    LSMASH_4CC( 'v', '2', '1', '6' ) );    /* Uncompressed Y'CbCr, 10, 12, 14, or 16-bit-per-component 4:2:2
++                                                                                             *      |Cb(16 LE)|Y'0(16 LE)|Cr(16 LE)|Y'1(16 LE)| */
++DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_V308_VIDEO,    LSMASH_4CC( 'v', '3', '0', '8' ) );    /* Uncompressed Y'CbCr, 8-bit-per-component 4:4:4
++                                                                                             *      |Cr(8)|Y'(8)|Cb(8)| */
++DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_V408_VIDEO,    LSMASH_4CC( 'v', '4', '0', '8' ) );    /* Uncompressed Y'CbCrA, 8-bit-per-component 4:4:4:4
++                                                                                             *      |Cb(8)|Y'(8)|Cr(8)|A(8)| */
++DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_V410_VIDEO,    LSMASH_4CC( 'v', '4', '1', '0' ) );    /* Uncompressed Y'CbCr, 10-bit-per-component 4:4:4
++                                                                                             *      |XX(2)|Cb(10)|Y'(10)|Cr(10)| (X is a zero bit) */
++DEFINE_QTFF_CODEC_TYPE( QT_CODEC_TYPE_YUV2_VIDEO,    LSMASH_4CC( 'y', 'u', 'v', '2' ) );    /* Uncompressed Y'CbCr, 8-bit-per-component 4:2:2
++                                                                                             *      |Y'0(8)|Cb(8)|Y'1(8)|Cr(8)| */
 +
 +/* Text CODEC identifiers */
 +DEFINE_ISOM_CODEC_TYPE( ISOM_CODEC_TYPE_ENCT_TEXT,   LSMASH_4CC( 'e', 'n', 'c', 't' ) );    /* Encrypted Text */
@@ -28613,10 +28629,10 @@ index 0000000..a6c5f6b
 +#endif /* #ifndef MP4SYS_H */
 diff --git a/output/mp4/summary.c b/output/mp4/summary.c
 new file mode 100644
-index 0000000..9e6fa74
+index 0000000..a9061c0
 --- /dev/null
 +++ b/output/mp4/summary.c
-@@ -0,0 +1,305 @@
+@@ -0,0 +1,306 @@
 +/*****************************************************************************
 + * summary.c:
 + *****************************************************************************
@@ -28808,6 +28824,7 @@ index 0000000..9e6fa74
 +    create_summary_table[i++] = (struct create_summary_table_tag){ type, func }
 +            ADD_CREATE_SUMMARY_TABLE_ELEMENT( ISOM_CODEC_TYPE_AVC1_VIDEO, isom_create_video_summary_from_description );
 +            ADD_CREATE_SUMMARY_TABLE_ELEMENT( ISOM_CODEC_TYPE_VC_1_VIDEO, isom_create_video_summary_from_description );
++            ADD_CREATE_SUMMARY_TABLE_ELEMENT( QT_CODEC_TYPE_2VUY_VIDEO, isom_create_video_summary_from_description );
 +            ADD_CREATE_SUMMARY_TABLE_ELEMENT( QT_CODEC_TYPE_APCH_VIDEO, isom_create_video_summary_from_description );
 +            ADD_CREATE_SUMMARY_TABLE_ELEMENT( QT_CODEC_TYPE_APCN_VIDEO, isom_create_video_summary_from_description );
 +            ADD_CREATE_SUMMARY_TABLE_ELEMENT( QT_CODEC_TYPE_APCS_VIDEO, isom_create_video_summary_from_description );
@@ -28924,7 +28941,7 @@ index 0000000..9e6fa74
 +}
 diff --git a/output/mp4/utils.c b/output/mp4/utils.c
 new file mode 100644
-index 0000000..20d5cf8
+index 0000000..a041e2a
 --- /dev/null
 +++ b/output/mp4/utils.c
 @@ -0,0 +1,841 @@
@@ -28969,17 +28986,17 @@ index 0000000..20d5cf8
 +        return;
 +    memset( bs->data, 0, bs->alloc );
 +    bs->store = 0;
-+    bs->pos = 0;
++    bs->pos   = 0;
 +}
 +
 +void lsmash_bs_free( lsmash_bs_t *bs )
 +{
 +    if( bs->data )
 +        free( bs->data );
-+    bs->data = NULL;
++    bs->data  = NULL;
 +    bs->alloc = 0;
 +    bs->store = 0;
-+    bs->pos = 0;
++    bs->pos   = 0;
 +}
 +
 +void lsmash_bs_alloc( lsmash_bs_t *bs, uint64_t size )
@@ -29106,7 +29123,7 @@ index 0000000..20d5cf8
 +    free( bs );
 +}
 +
-+void* lsmash_bs_export_data( lsmash_bs_t *bs, uint32_t* length )
++void *lsmash_bs_export_data( lsmash_bs_t *bs, uint32_t *length )
 +{
 +    if( !bs || !bs->data || bs->store == 0 || bs->error )
 +        return NULL;
@@ -29215,7 +29232,7 @@ index 0000000..20d5cf8
 +{
 +    if( !bs )
 +        return -1;
-+    if( !size )
++    if( size == 0 )
 +        return 0;
 +    lsmash_bs_alloc( bs, bs->store + size );
 +    if( bs->error || !bs->stream )
@@ -29255,7 +29272,7 @@ index 0000000..20d5cf8
 +{
 +    debug_if( !bits || !bs )
 +        return;
-+    bits->bs = bs;
++    bits->bs    = bs;
 +    bits->store = 0;
 +    bits->cache = 0;
 +}
@@ -29748,7 +29765,7 @@ index 0000000..20d5cf8
 +                "                                    ",
 +                "                                        "
 +            };
-+        fprintf( fp, indent_string[indent] );
++        fprintf( fp, "%s", indent_string[indent] );
 +    }
 +    else
 +        for( int i = 0; i < indent; i++ )
@@ -29771,7 +29788,7 @@ index 0000000..20d5cf8
 +}
 diff --git a/output/mp4/utils.h b/output/mp4/utils.h
 new file mode 100644
-index 0000000..9572f02
+index 0000000..39c6ba8
 --- /dev/null
 +++ b/output/mp4/utils.h
 @@ -0,0 +1,229 @@
@@ -29809,20 +29826,20 @@ index 0000000..9572f02
 +
 +typedef struct
 +{
-+    FILE *stream;     /* I/O stream */
-+    uint8_t error;
-+    uint8_t *data;    /* buffer for reading/writing */
-+    uint64_t store;   /* valid data size on buffer */
-+    uint64_t alloc;   /* total buffer size including invalid area */
-+    uint64_t pos;     /* data position on buffer to be read next */
-+    uint64_t written; /* data size written into "stream" already */
++    FILE    *stream;    /* I/O stream */
++    uint8_t  error;
++    uint8_t *data;      /* buffer for reading/writing */
++    uint64_t store;     /* valid data size on buffer */
++    uint64_t alloc;     /* total buffer size including invalid area */
++    uint64_t pos;       /* data position on buffer to be read next */
++    uint64_t written;   /* data size written into "stream" already */
 +} lsmash_bs_t;
 +
 +uint64_t lsmash_bs_get_pos( lsmash_bs_t *bs );
 +void lsmash_bs_empty( lsmash_bs_t *bs );
 +void lsmash_bs_free( lsmash_bs_t *bs );
 +void lsmash_bs_alloc( lsmash_bs_t *bs, uint64_t size );
-+lsmash_bs_t* lsmash_bs_create( char* filename );
++lsmash_bs_t *lsmash_bs_create( char *filename );
 +void lsmash_bs_cleanup( lsmash_bs_t *bs );
 +
 +/*---- bytestream writer ----*/
@@ -29837,7 +29854,7 @@ index 0000000..9572f02
 +void lsmash_bs_put_be24_from_64( lsmash_bs_t *bs, uint64_t value );
 +void lsmash_bs_put_be32_from_64( lsmash_bs_t *bs, uint64_t value );
 +int lsmash_bs_write_data( lsmash_bs_t *bs );
-+void *lsmash_bs_export_data( lsmash_bs_t *bs, uint32_t* length );
++void *lsmash_bs_export_data( lsmash_bs_t *bs, uint32_t *length );
 +
 +/*---- bytestream reader ----*/
 +uint8_t lsmash_bs_show_byte( lsmash_bs_t *bs, uint32_t offset );
@@ -29862,7 +29879,7 @@ index 0000000..9572f02
 +} lsmash_bits_t;
 +
 +void lsmash_bits_init( lsmash_bits_t* bits, lsmash_bs_t *bs );
-+lsmash_bits_t* lsmash_bits_create( lsmash_bs_t *bs );
++lsmash_bits_t *lsmash_bits_create( lsmash_bs_t *bs );
 +void lsmash_bits_empty( lsmash_bits_t *bits );
 +void lsmash_bits_put_align( lsmash_bits_t *bits );
 +void lsmash_bits_get_align( lsmash_bits_t *bits );
@@ -29871,10 +29888,10 @@ index 0000000..9572f02
 +/*---- bitstream writer ----*/
 +void lsmash_bits_put( lsmash_bits_t *bits, uint32_t width, uint64_t value );
 +uint64_t lsmash_bits_get( lsmash_bits_t *bits, uint32_t width );
-+lsmash_bits_t* lsmash_bits_adhoc_create();
-+void lsmash_bits_adhoc_cleanup( lsmash_bits_t* bits );
-+void* lsmash_bits_export_data( lsmash_bits_t* bits, uint32_t* length );
-+int lsmash_bits_import_data( lsmash_bits_t* bits, void* data, uint32_t length );
++lsmash_bits_t *lsmash_bits_adhoc_create();
++void lsmash_bits_adhoc_cleanup( lsmash_bits_t *bits );
++void* lsmash_bits_export_data( lsmash_bits_t *bits, uint32_t *length );
++int lsmash_bits_import_data( lsmash_bits_t *bits, void *data, uint32_t length );
 +
 +/*---- list ----*/
 +
@@ -29896,15 +29913,15 @@ index 0000000..9572f02
 +    uint32_t entry_count;
 +} lsmash_entry_list_t;
 +
-+typedef void (*lsmash_entry_data_eliminator)(void* data); /* very same as free() of standard c lib; void free(void *); */
++typedef void (*lsmash_entry_data_eliminator)(void *data); /* very same as free() of standard c lib; void free(void *); */
 +
 +void lsmash_init_entry_list( lsmash_entry_list_t *list );
 +lsmash_entry_list_t *lsmash_create_entry_list( void );
 +int lsmash_add_entry( lsmash_entry_list_t *list, void *data );
-+int lsmash_remove_entry_direct( lsmash_entry_list_t *list, lsmash_entry_t *entry, void* eliminator );
-+int lsmash_remove_entry( lsmash_entry_list_t *list, uint32_t entry_number, void* eliminator );
-+void lsmash_remove_entries( lsmash_entry_list_t *list, void* eliminator );
-+void lsmash_remove_list( lsmash_entry_list_t *list, void* eliminator );
++int lsmash_remove_entry_direct( lsmash_entry_list_t *list, lsmash_entry_t *entry, void *eliminator );
++int lsmash_remove_entry( lsmash_entry_list_t *list, uint32_t entry_number, void *eliminator );
++void lsmash_remove_entries( lsmash_entry_list_t *list, void *eliminator );
++void lsmash_remove_list( lsmash_entry_list_t *list, void *eliminator );
 +
 +lsmash_entry_t *lsmash_get_entry( lsmash_entry_list_t *list, uint32_t entry_number );
 +void *lsmash_get_entry_data( lsmash_entry_list_t *list, uint32_t entry_number );
@@ -31140,10 +31157,10 @@ index 0000000..bf7c7ac
 +}
 diff --git a/output/mp4/write.c b/output/mp4/write.c
 new file mode 100644
-index 0000000..96dbc0b
+index 0000000..c52f9af
 --- /dev/null
 +++ b/output/mp4/write.c
-@@ -0,0 +1,1918 @@
+@@ -0,0 +1,1919 @@
 +/*****************************************************************************
 + * write.c:
 + *****************************************************************************
@@ -32069,6 +32086,7 @@ index 0000000..96dbc0b
 +        ADD_WRITE_TABLE_ELEMENT( ISOM_CODEC_TYPE_AVC2_VIDEO, isom_write_visual_entry );
 +        ADD_WRITE_TABLE_ELEMENT( ISOM_CODEC_TYPE_AVC1_VIDEO, isom_write_visual_entry );
 +        ADD_WRITE_TABLE_ELEMENT( ISOM_CODEC_TYPE_VC_1_VIDEO, isom_write_visual_entry );
++        ADD_WRITE_TABLE_ELEMENT( QT_CODEC_TYPE_2VUY_VIDEO,   isom_write_visual_entry );
 +        ADD_WRITE_TABLE_ELEMENT( QT_CODEC_TYPE_APCH_VIDEO,   isom_write_visual_entry );
 +        ADD_WRITE_TABLE_ELEMENT( QT_CODEC_TYPE_APCN_VIDEO,   isom_write_visual_entry );
 +        ADD_WRITE_TABLE_ELEMENT( QT_CODEC_TYPE_APCS_VIDEO,   isom_write_visual_entry );
@@ -33108,7 +33126,7 @@ index 0000000..2068fbb
 +
 +#endif
 diff --git a/x264.c b/x264.c
-index 9b35871..8997a60 100644
+index 7565a1b..1b079e2 100644
 --- a/x264.c
 +++ b/x264.c
 @@ -114,9 +114,7 @@ static const char * const muxer_names[] =
@@ -33169,5 +33187,5 @@ index 9b35871..8997a60 100644
      else if( !strcasecmp( ext, "mkv" ) )
      {
 -- 
-1.7.7.msysgit.1
+1.8.1.msysgit.1
 
