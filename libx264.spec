@@ -1,7 +1,7 @@
-%define		snap	20130316
+%define		snap	20140110
 %define		snaph	2245
-%define		rel	2
-%define		api	130
+%define		rel	1
+%define		api	140
 
 Summary:	H264 encoder library
 Name:		libx264
@@ -10,14 +10,14 @@ Release:	1.%{snap}_%{snaph}.%{rel}
 License:	GPL v2
 Group:		Libraries
 Source0:	ftp://ftp.videolan.org/pub/videolan/x264/snapshots/x264-snapshot-%{snap}-%{snaph}.tar.bz2
-# Source0-md5:	252fa26a06c18b01fcab1eb18d04d040
+# Source0-md5:	3a1ec9e9058fcac4fba1413dbd5e8e4f
 # get rid of gpac
 # http://komisar.gin.by/x.patch/bm.patches/
-Patch0:		%{name}-mp4_L-SMASH.patch
 URL:		http://developers.videolan.org/x264.html
 BuildRequires:	gettext-devel
 BuildRequires:	gtk+-devel
-BuildRequires:	libav-devel
+BuildRequires:	l-smash-devel
+BuildRequires:	ffmpeg-devel
 BuildRequires:	pkg-config
 BuildRequires:	yasm
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
@@ -45,9 +45,8 @@ Header files for x264 library.
 
 %prep
 %setup -qn x264-snapshot-%{snap}-%{snaph}
-%patch0 -p1
 
-sed -i -e 's| \-s||g' configure
+%{__sed} -i -e 's| \-s||g' configure
 
 %build
 ./configure \
